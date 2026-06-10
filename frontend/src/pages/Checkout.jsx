@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { api, formatApiErrorDetail } from "@/lib/api";
@@ -29,10 +29,22 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState("card");
   const [placing, setPlacing] = useState(false);
 
-  const subtotal = cart.subtotal;
-  const shipping = subtotal > 4999 ? 0 : 499;
-  const tax = (subtotal - discount) * 0.18;
-  const total = subtotal - discount + shipping + tax;
+ const subtotal = cart.subtotal;
+const shipping = subtotal > 4999 ? 0 : 499;
+
+const coinDiscount = coinsUsed * 0.1;
+
+const tax = Math.max(
+  0,
+  (subtotal - discount - coinDiscount) * 0.18
+);
+
+const total =
+  subtotal -
+  discount -
+  coinDiscount +
+  shipping +
+  tax;
 
   const applyCoupon = async () => {
     try {
@@ -45,6 +57,7 @@ export default function Checkout() {
     }
   };
 
+
   const placeOrder = async () => {
     if (!addr.full_name || !addr.line1 || !addr.city || !addr.postal_code) {
       toast.error("Please complete the shipping address");
@@ -54,21 +67,23 @@ export default function Checkout() {
     try {
       if (paymentMethod === "card") {
         // Stripe Checkout (hosted page)
-        const { data } = await api.post("/orders/checkout-stripe", {
-          address: addr,
-          coupon_code: appliedCode || null,
-        });
+   const { data } = await api.post("/orders/checkout-stripe", {
+  address: addr,
+  coupon_code: appliedCode || null,
+  coins_used: coinsUsed,
+});
         if (data.url) {
           window.location.href = data.url;
           return;
         }
         throw new Error("Stripe session not created");
       }
-      const { data } = await api.post("/orders/checkout", {
-        address: addr,
-        coupon_code: appliedCode || null,
-        payment_method: paymentMethod,
-      });
+    const { data } = await api.post("/orders/checkout", {
+  address: addr,
+  coupon_code: appliedCode || null,
+  payment_method: paymentMethod,
+  coins_used: coinsUsed,
+});
       await refresh();
       navigate(`/order/${data.id}`, { state: { success: true } });
     } catch (e) {
@@ -78,6 +93,14 @@ export default function Checkout() {
     }
   };
 
+  const [coinsUsed, setCoinsUsed] = useState(0);
+const [wallet, setWallet] = useState(null);
+
+useEffect(() => {
+  api.get("/auth/wallet")
+    .then(({ data }) => setWallet(data))
+    .catch(() => {});
+}, []); 
   if (cart.items.length === 0) {
     return (
       <Layout>
@@ -170,7 +193,47 @@ export default function Checkout() {
                   </button>
                 </div>
               </div>
+
+              <div className="mt-6 pt-6 border-t border-black/15">
+  <div className="text-overline mb-3">
+    Wallet Coins
+  </div>
+
+  <div className="bg-white border border-black/10 p-4">
+    <div className="flex justify-between items-center mb-3">
+      <span className="text-sm text-black/60">
+        Available Coins
+      </span>
+
+      <span className="font-bold">
+        {wallet?.availableCoins || 0}
+      </span>
+    </div>
+
+    <input
+      type="number"
+      min="0"
+      max={wallet?.availableCoins || 0}
+      value={coinsUsed}
+      onChange={(e) =>
+        setCoinsUsed(Number(e.target.value))
+      }
+      className="w-full bg-white border border-black/20 px-3 py-3 text-sm focus:outline-none"
+      placeholder="Enter coins to redeem"
+    />
+
+    <div className="text-xs text-black/50 mt-2">
+      100 Coins = ₹10 Discount
+    </div>
+  </div>
+</div>
               <div className="mt-6 space-y-3 text-sm">
+                {coinsUsed > 0 && (
+  <div className="flex justify-between text-green-600">
+    <span>Wallet Coins</span>
+    <span>-{formatPrice(coinDiscount)}</span>
+  </div>
+)}
                 <div className="flex justify-between"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div>
                 {discount > 0 && (
                   <div className="flex justify-between text-black/70"><span>Discount ({appliedCode})</span><span>-{formatPrice(discount)}</span></div>

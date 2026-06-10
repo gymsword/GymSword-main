@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { User, MapPin, Package, Heart, Settings, LogOut } from "lucide-react";
+import { User, MapPin, Package, Heart, Settings,   Wallet,  Gift,   LogOut } from "lucide-react";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/context/AuthContext";
 import { useWishlist } from "@/context/WishlistContext";
@@ -15,6 +15,8 @@ const NAV = [
   { to: "/account/addresses", label: "Addresses", icon: MapPin },
   { to: "/account/wishlist", label: "Wishlist", icon: Heart },
   { to: "/account/settings", label: "Settings", icon: Settings },
+    { to: "/account/wallet", label: "Wallet", icon: Wallet },
+  { to: "/account/referrals", label: "Referrals", icon: Gift },
 ];
 
 export default function Account() {

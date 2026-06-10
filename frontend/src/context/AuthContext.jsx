@@ -65,8 +65,8 @@ setUser(data.user);
 return data.user;
 };
 
-  const register = async (name, email, password) => {
-    const { data } = await api.post("/auth/register", { name, email, password });
+  const register = async (name, email, password,referralCode) => {
+    const { data } = await api.post("/auth/register", { name, email, password,referralCode });
     if (data.access_token) localStorage.setItem("gs_token", data.access_token);
     setUser(data.user);
     return data.user;

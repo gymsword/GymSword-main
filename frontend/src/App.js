@@ -34,6 +34,8 @@ import Contact from "@/pages/Contact";
 import SEO from "@/components/SEO";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import AccountWallet from "./pages/account/AccountWallet";
+import AccountReferrals from "./pages/account/AccountReferrals";
 
 function App() {
   return (
@@ -69,6 +71,10 @@ function App() {
                   <Route path="addresses" element={<AccountAddresses />} />
                   <Route path="wishlist" element={<Wishlist />} />
                   <Route path="settings" element={<AccountSettings />} />
+                     <Route path="referrals" element={<AccountReferrals/>} />
+                    <Route path="wallet" element={<AccountWallet/>} />
+                   
+                     
                 </Route>
 
                 {/* Admin */}
@@ -82,6 +88,8 @@ function App() {
                   <Route path="messages" element={<AdminContactMessages />} />
                   <Route path="analytics" element={<AdminAnalytics />} />
                   <Route path="settings" element={<AdminSettings />} />
+
+                 
                 </Route>
               </Routes>
             </BrowserRouter>

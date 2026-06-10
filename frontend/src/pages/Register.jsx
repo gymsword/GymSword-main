@@ -4,22 +4,27 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { GymSwordLogo } from "@/components/GymSwordLogo";
 import { AUTH } from "@/constants/testIds";
-
+import { useSearchParams } from "react-router-dom";
 export default function Register() {
   const { register, formatErr } = useAuth();
+  
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+const [searchParams] = useSearchParams();
 
+const [referralCode, setReferralCode] = useState(
+  searchParams.get("ref") || ""
+);
   const submit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      await register(name, email, password);
+      await register(name, email, password,referralCode );
       toast.success("Welcome to GymSword");
       navigate("/account");
     } catch (e) {
@@ -40,6 +45,12 @@ export default function Register() {
             <Field id={AUTH.nameInput} label="Full Name" value={name} onChange={setName} />
             <Field id={AUTH.emailInput} label="Email" type="email" value={email} onChange={setEmail} />
             <Field id={AUTH.passwordInput} label="Password" type="password" value={password} onChange={setPassword} />
+         <Field
+  label="Referral Code (Optional)"
+  value={referralCode}
+  onChange={setReferralCode}
+  required={false}
+/>
           </div>
           {error && <div data-testid={AUTH.error} className="mt-4 text-sm text-black bg-black/5 p-3 border border-black/10">{error}</div>}
           <button data-testid={AUTH.submit} disabled={loading} className="btn-luxury-primary w-full mt-8">
@@ -69,14 +80,24 @@ export default function Register() {
   );
 }
 
-function Field({ id, label, type = "text", value, onChange }) {
+function Field({
+  id,
+  label,
+  type = "text",
+  value,
+  onChange,
+  required = true,
+}) {
   return (
     <label className="block">
-      <div className="text-overline text-black/60 mb-2">{label}</div>
+      <div className="text-overline text-black/60 mb-2">
+        {label}
+      </div>
+
       <input
         data-testid={id}
         type={type}
-        required
+        required={required}
         className="w-full bg-white border border-black/20 px-4 py-3 text-sm focus:outline-none focus:border-black"
         value={value}
         onChange={(e) => onChange(e.target.value)}
