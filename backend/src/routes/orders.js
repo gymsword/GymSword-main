@@ -10,6 +10,22 @@ const router = express.Router();
 
 async function purchasesEnabled() {
   const db = getDb();
+  const user = await db
+  .collection("users")
+  .findOne({ id: req.user.id });
+
+const coinsUsed = Number(
+  req.body.coins_used || 0
+);
+
+if (
+  coinsUsed >
+  (user?.wallet?.availableCoins || 0)
+) {
+  return res.status(400).json({
+    detail: "Insufficient wallet coins",
+  });
+}
   const s = await db.collection("settings").findOne({ id: "site" });
   return s?.enable_purchases === undefined ? true : !!s.enable_purchases;
 }
@@ -191,6 +207,21 @@ router.post("/checkout-stripe", requireAuth, async (req, res, next) => {
     order.stripe_session_id = session.id;
     order.stripe_url = session.url;
     await db.collection("orders").insertOne(order);
+    const rewardCoins = Math.floor(
+  order.total / 20
+);
+    if (coinsUsed > 0) {
+  await db.collection("users").updateOne(
+    { id: req.user.id },
+    {
+      $inc: {
+        "wallet.availableCoins": -coinsUsed,
+        "wallet.totalRedeemedCoins":
+          coinsUsed,
+      },
+    }
+  );
+}
 
     res.json({ order_id: order.id, session_id: session.id, url: session.url });
   } catch (e) {

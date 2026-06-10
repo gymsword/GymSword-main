@@ -75,59 +75,216 @@ function publicUser(u) {
 // Register
 router.post("/register", authLimiter, async (req, res, next) => {
   try {
-    const { email, password, name } = req.body || {};
-    if (!email || !password || !name) {
-      return res.status(400).json({ detail: "Name, email and password are required" });
-    }
-    if (password.length < 6) return res.status(400).json({ detail: "Password must be at least 6 chars" });
-    const db = getDb();
-    const lower = email.toLowerCase().trim();
-    const existing = await db.collection("users").findOne({ email: lower });
-    if (existing) return res.status(400).json({ detail: "Email already registered" });
-    const user = {
-      id: uuid(),
-      email: lower,
-      password_hash: await hashPassword(password),
+    console.log("REGISTER ROUTE HIT");
+
+    const { email, password, name, referralCode = "" } =
+      req.body || {};
+
+    console.log({
+      email,
+      password,
       name,
-      phone: "",
-      role: "user",
-      created_at: new Date().toISOString(),
-    };
-    await db.collection("users").insertOne(user);
-    const access_token = signAccessToken(user);
-    // Fire-and-forget welcome email
-    sendWelcomeEmail(user).catch(() => {});
-    res.json({ user: publicUser(user), access_token });
-  } catch (e) {
-    next(e);
-  }
+      referralCode,
+      type: typeof referralCode,
+          });
+
+if (!email || !password || !name) {
+  return res.status(400).json({
+    detail: "Name, email and password are required",
+  });
+}
+
+if (password.length < 6) {
+  return res.status(400).json({
+    detail: "Password must be at least 6 chars",
+  });
+}
+
+const db = getDb();
+const lower = email.toLowerCase().trim();
+
+const existing = await db
+  .collection("users")
+  .findOne({ email: lower });
+
+if (existing) {
+  return res.status(400).json({
+    detail: "Email already registered",
+  });
+}
+
+const referrer = referralCode
+  ? await db.collection("users").findOne({
+      referralCode: referralCode.trim(),
+    })
+  : null;
+
+console.log(
+  "REFERRER FOUND:",
+  referrer ? referrer.email : "NOT FOUND"
+);
+
+const user = {
+  id: uuid(),
+
+  email: lower,
+
+  password_hash: await hashPassword(password),
+
+  name,
+
+  phone: "",
+
+  role: "user",
+
+  referralCode:
+    "GS" +
+    Math.floor(
+      100000 + Math.random() * 900000
+    ),
+
+  referredBy:
+    referrer?.referralCode || null,
+
+  referralRewardGiven: false,
+
+  referrals: [],
+
+  wallet: {
+    availableCoins: 0,
+    totalEarnedCoins: 0,
+    totalRedeemedCoins: 0,
+    referralCoins: 0,
+    shoppingCoins: 0,
+    membershipLevel: "Silver",
+  },
+
+  created_at: new Date().toISOString(),
+};
+
+await db.collection("users").insertOne(user);
+
+if (referrer) {
+  console.log(
+    "AWARDING REFERRAL REWARDS TO:",
+    user.email
+  );
+
+  // New User +25 Coins
+  await db.collection("users").updateOne(
+    { id: user.id },
+    {
+      $inc: {
+        "wallet.availableCoins": 25,
+        "wallet.totalEarnedCoins": 25,
+      },
+      $set: {
+        referralRewardGiven: true,
+      },
+    }
+  );
+
+  // Referrer +50 Coins
+  await db.collection("users").updateOne(
+    { id: referrer.id },
+    {
+      $inc: {
+        "wallet.availableCoins": 50,
+        "wallet.referralCoins": 50,
+        "wallet.totalEarnedCoins": 50,
+      },
+      $push: {
+        referrals: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          joinedAt:
+            new Date().toISOString(),
+        },
+      },
+    }
+  );
+
+  console.log(
+    "REFERRAL REWARD SUCCESSFULLY GIVEN"
+  );
+}
+
+const access_token = signAccessToken(user);
+
+sendWelcomeEmail(user).catch(() => {});
+
+res.json({
+  user: publicUser(user),
+  access_token,
+});
+
+
+} catch (e) {
+next(e);
+}
 });
 
 // Login (regular users)
 router.post("/login", authLimiter, async (req, res, next) => {
   try {
     const { email, password } = req.body || {};
-    if (!email || !password) return res.status(400).json({ detail: "Email and password required" });
+
+    if (!email || !password) {
+      return res.status(400).json({
+        detail: "Email and password required",
+      });
+    }
+
     const db = getDb();
     const lower = email.toLowerCase().trim();
     const identifier = identifierFor(req, lower);
+
     await checkLockout(db, identifier);
-    const user = await db.collection("users").findOne({ email: lower });
-    if (!user || !(await verifyPassword(password, user.password_hash))) {
+
+    const user = await db.collection("users").findOne({
+      email: lower,
+    });
+
+    if (
+      !user ||
+      !(await verifyPassword(password, user.password_hash))
+    ) {
       await recordFailure(db, identifier);
-      return res.status(401).json({ detail: "Invalid email or password" });
+
+      return res.status(401).json({
+        detail: "Invalid email or password",
+      });
     }
+
     if (user.role === "admin") {
-      return res.status(403).json({ detail: "Use /admin/login for administrator access" });
+      return res.status(403).json({
+        detail:
+          "Use /admin/login for administrator access",
+      });
     }
+
     await clearFailures(db, identifier);
+
+    console.log("LOGIN USER:", user.email);
+    console.log("REFERRED BY:", user.referredBy);
+    console.log(
+      "REWARD GIVEN:",
+      user.referralRewardGiven
+    );
+
+   
+
     const access_token = signAccessToken(user);
-    res.json({ user: publicUser(user), access_token });
+
+    res.json({
+      user: publicUser(user),
+      access_token,
+    });
   } catch (e) {
     next(e);
   }
 });
-
 // Admin login
 router.post("/admin-login", authLimiter, async (req, res, next) => {
 try {
@@ -346,5 +503,76 @@ router.delete("/addresses/:id", requireAuth, async (req, res, next) => {
     next(e);
   }
 });
+router.get("/wallet", requireAuth, async (req, res, next) => {
+  try {
+    const user = await getDb()
+      .collection("users")
+      .findOne(
+        { id: req.user.id },
+        {
+          projection: {
+            _id: 0,
+            wallet: 1,
+          },
+        }
+      );
+
+    res.json(
+      user?.wallet || {
+        availableCoins: 0,
+        totalEarnedCoins: 0,
+        totalRedeemedCoins: 0,
+        referralCoins: 0,
+        shoppingCoins: 0,
+        membershipLevel: "Silver",
+      }
+    );
+  } catch (e) {
+    next(e);
+  }
+});
+
+
+
+router.get(
+  "/referrals",
+  requireAuth,
+  async (req, res, next) => {
+    try {
+      const user = await getDb()
+        .collection("users")
+        .findOne(
+          { id: req.user.id },
+          {
+            projection: {
+              _id: 0,
+              referralCode: 1,
+              wallet: 1,
+              referrals: 1,
+            },
+          }
+        );
+
+      res.json({
+        referralCode:
+          user?.referralCode || "",
+
+        totalReferrals:
+          user?.referrals?.length || 0,
+
+        referralCoins:
+          user?.wallet?.referralCoins || 0,
+
+        availableCoins:
+          user?.wallet?.availableCoins || 0,
+
+        referrals:
+          user?.referrals || [],
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
 
 export default router;
