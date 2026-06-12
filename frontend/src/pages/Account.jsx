@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { User, MapPin, Package, Heart, Settings,   Wallet,  Gift,   LogOut } from "lucide-react";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/context/AuthContext";
@@ -22,16 +22,27 @@ const NAV = [
 export default function Account() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+    const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }, [location.pathname]);
+
   return (
     <Layout>
       <div data-testid={ACCOUNT.dashboard} className="max-w-[1600px] mx-auto px-6 md:px-12 py-12 md:py-20 grid lg:grid-cols-12 gap-12">
-        <aside className="lg:col-span-3 space-y-6">
+        <aside className="lg:col-span-3">
+  <div className="lg:sticky lg:top-24 space-y-6">
           <div>
             <div className="text-overline text-black/50">Account</div>
             <div className="font-display uppercase text-2xl font-black mt-1">{user.name || user.email}</div>
             <div className="text-xs text-black/50 mt-1">{user.email}</div>
           </div>
-          <nav className="flex lg:flex-col gap-1 overflow-x-auto">
+          <nav className="flex lg:flex-col gap-1 overflow-x-auto scrollbar-hide">
             {NAV.map((n) => (
               <NavLink
                 key={n.to}
@@ -55,6 +66,8 @@ export default function Account() {
               Sign Out
             </button>
           </nav>
+            </div>
+
         </aside>
         <section className="lg:col-span-9">
           <Outlet />

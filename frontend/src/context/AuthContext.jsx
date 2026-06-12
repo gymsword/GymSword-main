@@ -14,7 +14,7 @@ export function AuthProvider({ children }) {
     } catch {
       setUser(false);
     } finally {
-      setReady(true);
+      setReady(true);a
     }
   }, []);
 
@@ -31,25 +31,7 @@ export function AuthProvider({ children }) {
 
 const adminLogin = async (email, password) => {
 // Manual Admin Login
-if (
-email === "[gymsword2024@gmail.com](mailto:gymsword2024@gmail.com)" &&
-password === "#Sword@2024"
-) {
-const adminUser = {
-id: "admin-1",
-name: "GymSword Admin",
-email: "[gymsword2024@gmail.com](mailto:gymsword2024@gmail.com)",
-role: "admin",
-};
 
-```
-localStorage.setItem("gs_token", "admin-token");
-setUser(adminUser);
-
-return adminUser;
-```
-
-}
 
 // Existing Backend Login Logic
 const { data } = await api.post("/auth/admin-login", {
@@ -89,6 +71,6 @@ return data.user;
   );
 }
 
-export function useAuth() {
+export function useAuth() { 
   return useContext(AuthContext);
 }

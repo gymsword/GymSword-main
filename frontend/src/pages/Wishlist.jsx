@@ -32,7 +32,7 @@ export default function Wishlist() {
   };
 
   return (
-    <Layout>
+ 
       <div className="max-w-[1400px] mx-auto px-6 md:px-12 py-12 md:py-20">
         <h1 className="font-display uppercase font-black text-4xl sm:text-6xl mb-12">Wishlist</h1>
         {items.length === 0 ? (
@@ -66,6 +66,6 @@ export default function Wishlist() {
           </div>
         )}
       </div>
-    </Layout>
+  
   );
 }
