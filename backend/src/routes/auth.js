@@ -150,14 +150,16 @@ const user = {
 
   referrals: [],
 
-  wallet: {
-    availableCoins: 0,
-    totalEarnedCoins: 0,
-    totalRedeemedCoins: 0,
-    referralCoins: 0,
-    shoppingCoins: 0,
-    membershipLevel: "Silver",
-  },
+wallet: {
+  availableCoins: 0,
+  totalEarnedCoins: 0,
+  totalRedeemedCoins: 0,
+  referralCoins: 0,
+  shoppingCoins: 0,
+  membershipLevel: "Silver",
+
+  transactions: [],
+},
 
   created_at: new Date().toISOString(),
 };
@@ -170,38 +172,57 @@ if (referrer) {
     user.email
   );
 
-  // New User +25 Coins
-  await db.collection("users").updateOne(
-    { id: user.id },
-    {
-      $inc: {
-        "wallet.availableCoins": 25,
-        "wallet.totalEarnedCoins": 25,
-      },
-      $set: {
-        referralRewardGiven: true,
-      },
-    }
-  );
+ await db.collection("users").updateOne(
+  { id: user.id },
+  {
+    $inc: {
+      "wallet.availableCoins": 25,
+      "wallet.totalEarnedCoins": 25,
+    },
+
+    $set: {
+      referralRewardGiven: true,
+    },
+
+  $push: {
+  "wallet.transactions": {
+    _id: uuid(),
+    coins: 25,
+    type: "referral",
+    referralUser: referrer.name,
+    referralEmail: referrer.email,
+    description: "Welcome Referral Bonus",
+    createdAt: new Date().toISOString(),
+  },
+},
+  }
+);
 
   // Referrer +50 Coins
   await db.collection("users").updateOne(
     { id: referrer.id },
     {
-      $inc: {
-        "wallet.availableCoins": 50,
-        "wallet.referralCoins": 50,
-        "wallet.totalEarnedCoins": 50,
-      },
-      $push: {
-        referrals: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          joinedAt:
-            new Date().toISOString(),
-        },
-      },
+$inc: {
+  "wallet.availableCoins": 50,
+  "wallet.referralCoins": 50,
+  "wallet.totalEarnedCoins": 50,
+},
+
+$push: {
+  referrals: {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    joinedAt: new Date().toISOString(),
+  },
+
+  "wallet.transactions": {
+    _id: uuid(),
+    coins: 50,
+    description: `Referral Reward - ${user.name}`,
+    createdAt: new Date().toISOString(),
+  },
+},
     }
   );
 
@@ -300,25 +321,25 @@ if (!email || !password) {
 const lower = email.toLowerCase().trim();
 
 // Manual Admin Login
-if (
-  lower === "gymsword2024@gmail.com" &&
-  password === "#Sword@2024"
-) {
-  const adminUser = {
-    id: "admin-1",
-    email: "gymsword2024@gmail.com",
-    name: "GymSword Admin",
-    role: "admin",
-    created_at: new Date().toISOString(),
-  };
+// if (
+//   lower === "gymsword2024@gmail.com" &&
+//   password === "#Sword@2024"
+// ) {
+//   const adminUser = {
+//     id: "admin-1",
+//     email: "gymsword2024@gmail.com",
+//     name: "GymSword Admin",
+//     role: "admin",
+//     created_at: new Date().toISOString(),
+//   };
 
-  const access_token = signAccessToken(adminUser);
+//   const access_token = signAccessToken(adminUser);
 
-  return res.json({
-    user: adminUser,
-    access_token,
-  });
-}
+//   return res.json({
+//     user: adminUser,
+//     access_token,
+//   });
+// }
 
 const db = getDb();
 const identifier = identifierFor(req, lower, "admin:");
@@ -512,21 +533,24 @@ router.get("/wallet", requireAuth, async (req, res, next) => {
         {
           projection: {
             _id: 0,
+            email: 1,
             wallet: 1,
           },
         }
       );
 
-    res.json(
-      user?.wallet || {
-        availableCoins: 0,
-        totalEarnedCoins: 0,
-        totalRedeemedCoins: 0,
-        referralCoins: 0,
-        shoppingCoins: 0,
-        membershipLevel: "Silver",
-      }
-    );
+    console.log("CURRENT USER:", user.email);
+    console.log("CURRENT WALLET:", user.wallet);
+
+    res.json({
+      availableCoins: user.wallet?.availableCoins || 0,
+      totalEarnedCoins: user.wallet?.totalEarnedCoins || 0,
+      totalRedeemedCoins: user.wallet?.totalRedeemedCoins || 0,
+      referralCoins: user.wallet?.referralCoins || 0,
+      shoppingCoins: user.wallet?.shoppingCoins || 0,
+      membershipLevel: user.wallet?.membershipLevel || "Silver",
+      transactions: user.wallet?.transactions || [],
+    });
   } catch (e) {
     next(e);
   }
@@ -575,4 +599,54 @@ router.get(
   }
 );
 
+
+router.post(
+  "/redeem-coins",
+  requireAuth,
+  async (req, res, next) => {
+    try {
+      const { coins } = req.body;
+
+      const db = getDb();
+
+      const user = await db
+        .collection("users")
+        .findOne({ id: req.user.id });
+
+      if (coins > user.wallet.availableCoins) {
+        return res.status(400).json({
+          detail: "Not enough coins",
+        });
+      }
+
+      const discount = (coins / 100) * 40;
+
+await db.collection("users").updateOne(
+  { id: req.user.id },
+  {
+    $inc: {
+      "wallet.availableCoins": -coins,
+      "wallet.totalRedeemedCoins": coins,
+    },
+
+    $push: {
+      "wallet.transactions": {
+        _id: uuid(),
+        coins: -coins,
+        description: `Redeemed ₹${discount} Discount`,
+        createdAt: new Date().toISOString(),
+      },
+    },
+  }
+);
+
+      res.json({
+        success: true,
+        discount,
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
 export default router;
